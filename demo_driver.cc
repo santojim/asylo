@@ -36,6 +36,7 @@ ABSL_FLAG(std::string, sha1sum, "", "The message to digest using sha1sum");
 ABSL_FLAG(std::string, sha512sum, "", "The message to digest using sha512sum");
 ABSL_FLAG(std::string, message2, "", "The second message to encrypt");
 ABSL_FLAG(std::string, ciphertext, "", "The ciphertext message to decrypt");
+ABSL_FLAG(std::string, creatersa, "", "create rsa keypair encrypt message and decrypt it");
 
 // Populates |enclave_input|->value() with |user_message|.
 //void SetEnclaveUserMessage(asylo::EnclaveInput *enclave_input,
@@ -160,6 +161,15 @@ int main(int argc, char *argv[]) {
     status = client->EnterAndRun(input, &output);
     LOG_IF(QFATAL, !status.ok()) << "EnterAndRun failed with: " << status;
     std::cout << "Decrypted ciphertext from driver:" << std::endl
+              << GetEnclaveOutputMessage(output) << std::endl;
+  }
+
+  if (!absl::GetFlag(FLAGS_creatersa).empty()) {
+    SetEnclaveUserMessage(&input, absl::GetFlag(FLAGS_creatersa),
+                          guide::asylo::Demo::CREATERSA);
+    status = client->EnterAndRun(input, &output);
+    LOG_IF(QFATAL, !status.ok()) << "EnterAndRun failed with: " << status;
+    std::cout << "RSA keypair created, decrypted text :" << std::endl
               << GetEnclaveOutputMessage(output) << std::endl;
   }
 //  LOG_IF(QFATAL, !status.ok()) << "EnterAndRun failed with: " << status;

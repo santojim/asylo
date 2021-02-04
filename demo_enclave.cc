@@ -43,6 +43,10 @@
 
 
 
+#define KEY_LENGTH 2048 // RSA Key length
+#define PUB_KEY_FILE "pubkey.pem" // RSA public key path
+#define PRI_KEY_FILE "prikey.pem" // RSA private key path
+
 
 
 namespace asylo {
@@ -57,6 +61,164 @@ inline bool file_exists (const std::string& name) {
   return (stat (name.c_str(), &buffer) == 0);
 }
 
+/*
+ @brief: private key encryption
+ @para: clear_text -[i] The clear text that needs to be encrypted
+                   pri_key -[i] private key
+ @return: Encrypted data
+**/
+std::string RsaPriEncrypt(const std::string &clear_text, std::string &pri_key)
+{
+    std::string encrypt_text;
+    BIO *keybio = BIO_new_mem_buf((unsigned char *)pri_key.c_str(), -1);
+    RSA* rsa = RSA_new();
+    rsa = PEM_read_bio_RSAPrivateKey(keybio, &rsa, NULL, NULL);
+    if (!rsa)
+    {
+        BIO_free_all(keybio);
+        return std::string("");
+    }
+
+     // Get the maximum length of data that RSA can process at a time
+    int len = RSA_size(rsa);
+
+     // Apply for memory: store encrypted ciphertext data
+    char *text = new char[len + 1];
+    memset(text, 0, len + 1);
+
+     // Encrypt the data with a private key (the return value is the length of the encrypted data)
+    int ret = RSA_private_encrypt(clear_text.length(), (const unsigned char*)clear_text.c_str(), (unsigned char*)text, rsa, RSA_PKCS1_PADDING);
+    if (ret >= 0) {
+        encrypt_text = std::string(text, ret);
+    }
+
+     // release memory
+    free(text);
+    BIO_free_all(keybio);
+    RSA_free(rsa);
+
+    return encrypt_text;
+}
+/*
+ @brief: public key decryption
+ @para: cipher_text -[i] encrypted ciphertext
+                   pub_key -[i] public key
+ @return: decrypted data
+**/
+std::string RsaPubDecrypt(const std::string & cipher_text, const std::string & pub_key)
+{
+    std::string decrypt_text;
+    BIO *keybio = BIO_new_mem_buf((unsigned char *)pub_key.c_str(), -1);
+    RSA *rsa = RSA_new();
+
+     // Note--------Use the public key in the first format for decryption
+    //rsa = PEM_read_bio_RSAPublicKey(keybio, &rsa, NULL, NULL);
+     // Note--------Use the public key in the second format for decryption (we use this format as an example)
+    rsa = PEM_read_bio_RSA_PUBKEY(keybio, &rsa, NULL, NULL);
+    if (!rsa)
+    {
+         unsigned long err = ERR_get_error(); //Get the error number
+        char err_msg[1024] = { 0 };
+                 ERR_error_string(err, err_msg); // Format: error:errId: library: function: reason
+        printf("err msg: err:%ld, msg:%s\n", err, err_msg);
+        BIO_free_all(keybio);
+        return decrypt_text;
+    }
+
+    int len = RSA_size(rsa);
+    char *text = new char[len + 1];
+    memset(text, 0, len + 1);
+     // Decrypt the ciphertext
+    int ret = RSA_public_decrypt(cipher_text.length(), (const unsigned char*)cipher_text.c_str(), (unsigned char*)text, rsa, RSA_PKCS1_PADDING);
+    if (ret >= 0) {
+        decrypt_text.append(std::string(text, ret));
+    }
+
+     // release memory
+    delete text;
+    BIO_free_all(keybio);
+    RSA_free(rsa);
+
+    return decrypt_text;
+}
+
+/*
+ Manufacturing key pair: private key and public key
+**/
+void GenerateRSAKey(std::string & out_pub_key, std::string & out_pri_key)
+{
+    size_t pri_len = 0; // Private key length
+    size_t pub_len = 0; // public key length
+    char *pri_key = nullptr; // private key
+    char *pub_key = nullptr; // public key
+    RSA *keypair = NULL;
+    BIGNUM *bne = NULL;
+    int ret = 0;
+    unsigned long e = RSA_F4;
+
+
+     // Generate key pair
+    //RSA *keypair = RSA_generate_key(KEY_LENGTH, RSA_3, NULL, NULL);
+    bne = BN_new();
+    ret = BN_set_word(bne, e);
+    keypair = RSA_new();
+    ret = RSA_generate_key_ex(keypair, KEY_LENGTH, bne, NULL);
+
+    BIO *pri = BIO_new(BIO_s_mem());
+    BIO *pub = BIO_new(BIO_s_mem());
+
+         // Generate private key
+    PEM_write_bio_RSAPrivateKey(pri, keypair, NULL, NULL, 0, NULL, NULL);
+         // Note------Generate the public key in the first format
+    //PEM_write_bio_RSAPublicKey(pub, keypair);
+         // Note------Generate the public key in the second format (this is used in the code here)
+    PEM_write_bio_RSA_PUBKEY(pub, keypair);
+
+     // Get the length
+    pri_len = BIO_pending(pri);
+    pub_len = BIO_pending(pub);
+
+     // The key pair reads the string
+    pri_key = (char *)malloc(pri_len + 1);
+    pub_key = (char *)malloc(pub_len + 1);
+
+    BIO_read(pri, pri_key, pri_len);
+    BIO_read(pub, pub_key, pub_len);
+
+    pri_key[pri_len] = '\0';
+    pub_key[pub_len] = '\0';
+
+    out_pub_key = pub_key;
+    out_pri_key = pri_key;
+
+     // Write the public key to the file
+    std::ofstream pub_file(PUB_KEY_FILE, std::ios::out);
+    if (!pub_file.is_open())
+    {
+        perror("pub key file open fail:");
+        return;
+    }
+    pub_file << pub_key;
+    pub_file.close();
+
+     // write private key to file
+    std::ofstream pri_file(PRI_KEY_FILE, std::ios::out);
+    if (!pri_file.is_open())
+    {
+        perror("pri key file open fail:");
+        return;
+    }
+    pri_file << pri_key;
+    pri_file.close();
+
+     // release memory
+    RSA_free(keypair);
+    BIO_free_all(pub);
+    BIO_free_all(pri);
+
+    free(pri_key);
+    free(pub_key);
+}
 
 std::string Md5Sum(std::string input) {
     unsigned char digest[MD5_DIGEST_LENGTH];
@@ -109,161 +271,6 @@ std::string Sha2Sum(std::string input) {
 //    printf("SHA512 digest: %s\n", mdString);
 
 }
-
-bool generate_key() {
-        size_t pri_len;            // Length of private key
-        size_t pub_len;            // Length of public key
-        char *pri_key;           // Private key in PEM
-        char *pub_key;           // Public key in PEM
-
-        int ret = 0;
-        RSA *r = NULL;
-        BIGNUM *bne = NULL;
-        BIO *bp_public = NULL, *bp_private = NULL;
-        int bits = 2048;
-        unsigned long e = RSA_F4;
-
-        RSA *pb_rsa = NULL;
-        RSA *p_rsa = NULL;
-        EVP_PKEY *evp_pbkey = NULL;
-        EVP_PKEY *evp_pkey = NULL;
-
-        BIO *pbkeybio = NULL;
-        BIO *pkeybio = NULL;
-        FILE *pkey_file = fopen("private.pem", "wb");
-        FILE *pbkey_file = fopen("public.pem", "wb");
-        FILE *pbkey_from_file = fopen("public.pem","r");
-        FILE *pkey_from_file = fopen("private.pem","r");
-        // 0. check if key already exits
-        if (file_exists("private.pem") ) {
-            std::cout<< "private pem exists" <<std::endl;
-        }
-        else {
-            std::cout<<"private.pem doesn't exist " << std::endl;
-        }
-        // 1. generate rsa key
-        bne = BN_new();
-        ret = BN_set_word(bne, e);
-        if (ret != 1) {
-            goto free_all;
-        }
-
-        r = RSA_new();
-        ret = RSA_generate_key_ex(r, bits, bne, NULL);
-        if (ret != 1) {
-            goto free_all;
-        }
-
-        // 2. save public key in file private.pem
-        // ----------------------private key to file-------------------------//
-        if (!pkey_file) {
-            std::cerr << "Unable to open \"private.pem\" for writing." << std::endl;
-            return false;
-        }
-        ret = PEM_write_RSAPrivateKey(pkey_file, r, NULL, NULL, 0, NULL, NULL);
-        fclose(pkey_file);
-        if(!ret) {
-            std::cerr << "Unable to write private key to disk." << std::endl;
-            return false;
-        }
-        // ----------------------public key to file-------------------------//
-        if (!pbkey_file) {
-            std::cerr << "Unable to open \"public.pem\" for writing." << std::endl;
-            return false;
-        }
-        ret = PEM_write_RSAPublicKey(pbkey_file, r);
-        fclose(pbkey_file);
-        if(!ret) {
-            std::cerr << "Unable to write public key to disk." << std::endl;
-            return false;
-        }
-        // -----------------------------------------------------------------//
-        //bp_public = BIO_new_file("public.pem", "w");
-        bp_public = BIO_new(BIO_s_mem());
-        ret = PEM_write_bio_RSAPublicKey(bp_public, r);
-        if (ret != 1) {
-            goto free_all;
-        }
-
-        // 3. save private key
-        //bp_private = BIO_new_file("private.pem", "w");
-        bp_private = BIO_new(BIO_s_mem());
-        ret = PEM_write_bio_RSAPrivateKey(bp_private, r, NULL, NULL, 0, NULL, NULL);
-        if (ret != 1) {
-            goto free_all;
-        }
-
-        //4. Get the keys are PEM formatted strings
-
-        pri_len = BIO_pending(bp_private);
-        pub_len = BIO_pending(bp_public);
-
-        pri_key = (char*) malloc(pri_len + 1);
-        pub_key = (char*) malloc(pub_len + 1);
-
-        BIO_read(bp_private, pri_key, pri_len);
-        BIO_read(bp_public, pub_key, pub_len);
-
-        pri_key[pri_len] = '\0';
-        pub_key[pub_len] = '\0';
-
-        printf("\n%s\n%s\n", pri_key, pub_key);
-
-        //verify if you are able to re-construct the keys
-        pbkeybio = BIO_new_mem_buf((void*) pub_key, pub_len);
-        if (pbkeybio == NULL) {
-            return -1;
-        }
-        pb_rsa = PEM_read_bio_RSAPublicKey(pbkeybio, &pb_rsa, NULL, NULL);
-        if (pb_rsa == NULL) {
-            char buffer[120];
-            ERR_error_string(ERR_get_error(), buffer);
-            printf("Error reading public key:%s\n", buffer);
-        }
-        evp_pbkey = EVP_PKEY_new();
-        EVP_PKEY_assign_RSA(evp_pbkey, pb_rsa);
-
-        pkeybio = BIO_new_mem_buf((void*) pri_key, pri_len);
-        BIO_read_filename (pkeybio, "private.pem");
-        if (pkeybio == NULL) {
-            return -1;
-        }
-        p_rsa = PEM_read_bio_RSAPrivateKey(pkeybio, &p_rsa, NULL, NULL);
-        if (p_rsa == NULL) {
-            char buffer[120];
-            ERR_error_string(ERR_get_error(), buffer);
-            printf("Error reading private key:%s\n", buffer);
-        }
-        evp_pkey = EVP_PKEY_new();
-        EVP_PKEY_assign_RSA(evp_pkey, p_rsa);
-
-        BIO_free(pbkeybio);
-        BIO_free(pkeybio);
-        // 5. read from file
-        p_rsa = PEM_read_RSAPublicKey(pbkey_from_file,&p_rsa,NULL,NULL);
-        std::cout << "from file key n=:" << p_rsa->n << std::endl;
-        std::cout << "from file key e=:" << p_rsa->e << std::endl;
-        std::cout << "from file key d=:" << p_rsa->d << std::endl;
-        std::cout << "from file key dmp1=:" << p_rsa->dmp1 << std::endl;
-        std::cout << "from file key dmq1=:" << p_rsa->dmq1 << std::endl;
-        p_rsa = PEM_read_RSAPrivateKey(pkey_from_file,&p_rsa,NULL,NULL);
-        std::cout << "from file key n=:" << p_rsa->n << std::endl;
-        std::cout << "from file key e=:" << p_rsa->e << std::endl;
-        std::cout << "from file key d=:" << p_rsa->d << std::endl;
-        std::cout << "from file key dmp1=:" << p_rsa->dmp1 << std::endl;
-        std::cout << "from file key dmq1:" << p_rsa->dmq1 << std::endl;
-
-        // 4. free
-        free_all:
-
-        BIO_free_all(bp_public);
-        BIO_free_all(bp_private);
-        RSA_free(r);
-        BN_free(bne);
-
-        return (ret == 1);
-    }
-
 
 // Helper function that adapts absl::BytesToHexString, allowing it to be used
 // with ByteContainerView.
@@ -333,25 +340,12 @@ class EnclaveDemo : public TrustedApplication {
  public:
   EnclaveDemo() = default;
 
-//  Status Run(const EnclaveInput &input, EnclaveOutput *output) {
-//    std::string user_message = GetEnclaveUserMessage(input);
-//
-//    std::string result;
-//    ASYLO_ASSIGN_OR_RETURN(result, EncryptMessage(user_message));
-//    SetEnclaveOutputMessage(output,result);
-//    SetEnclaveOutputMessage(output,Md5Sum(user_message));
-//    SetEnclaveOutputMessage(output,Sha1Sum(user_message));
-//    SetEnclaveOutputMessage(output,Sha2Sum(user_message));
-//    std::cout << "eclave side :Encrypted message:" << std::endl << result << std::endl;
-////    generate_key();
-////    std::cout<<"md5sum returned: " << Md5Sum(user_message) << std::endl;
-////    std::cout<<"sha returned: " << Sha1Sum(user_message) << std::endl;
-////    std::cout<<"sha512 returned: " << Sha2Sum(user_message) << std::endl;
-//
-//    return Status::OkStatus();
-//  }
   Status Run(const EnclaveInput &input, EnclaveOutput *output) {
     std::string user_message = GetEnclaveUserMessage(input);
+    std::string pubkey,prikey;
+
+    std::string encrypt_text;
+    std::string decrypt_text;
 
     switch (GetEnclaveUserAction(input)) {
       case guide::asylo::Demo::ENCRYPT: {
@@ -370,6 +364,13 @@ class EnclaveDemo : public TrustedApplication {
       }
       case guide::asylo::Demo::SHA512SUM: {
         SetEnclaveOutputMessage(output, Sha2Sum(user_message));
+        break;
+      }
+      case guide::asylo::Demo::CREATERSA: {
+        GenerateRSAKey(pubkey,prikey);
+        encrypt_text = RsaPriEncrypt((user_message), prikey);
+        decrypt_text = RsaPubDecrypt(encrypt_text, pubkey);
+        SetEnclaveOutputMessage(output, decrypt_text);
         break;
       }
       case guide::asylo::Demo::DECRYPT: {
