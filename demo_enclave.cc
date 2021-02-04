@@ -60,6 +60,49 @@ inline bool file_exists (const std::string& name) {
   struct stat buffer;
   return (stat (name.c_str(), &buffer) == 0);
 }
+/*
+ @brief: signs and verifies a givens string
+ @para: data, the string to be signed and verified
+**/
+void doSign(std::string data)
+{
+    RSA * pubkey=NULL;
+    RSA * prikey=NULL;
+    FILE *pbkey_from_file = fopen(PUB_KEY_FILE,"r");
+    FILE *pkey_from_file = fopen(PRI_KEY_FILE,"r");
+    unsigned char digest[SHA512_DIGEST_LENGTH];
+    unsigned char sign[512];
+    unsigned int signLen;
+    int     ret;
+    // read public key from file for verifying signature
+    pubkey = PEM_read_RSAPublicKey(pbkey_from_file,&pubkey,NULL,NULL);
+    // read private key from file for signing
+    prikey = PEM_read_RSAPrivateKey(pkey_from_file,&prikey,NULL,NULL);
+
+    // caclculate the hash of the messsage to be signed
+    SHA512_CTX ctx;
+    SHA512_Init(&ctx);
+    SHA512_Update(&ctx,(const char *) data.c_str(), strlen(data.c_str()));
+    SHA512_Final(digest, &ctx);
+
+    unsigned char mdString[SHA512_DIGEST_LENGTH*2+1];
+    for (int i = 0; i < SHA512_DIGEST_LENGTH; i++)
+        sprintf((char *) &mdString[i*2], "%02x", (unsigned int)digest[i]);
+
+    /* Sign the hash*/
+    ret = RSA_sign(NID_sha512 , mdString, SHA512_DIGEST_LENGTH, sign,
+                   &signLen, prikey);
+    //printf("Signature length = %d\n", signLen);
+    printf("RSA_sign: %s\n", (ret == 1) ? "OK" : "NG");
+
+    /* Verify signature*/
+    ret = RSA_verify(NID_sha512, mdString, SHA512_DIGEST_LENGTH, sign,
+                     signLen, pubkey);
+    printf("RSA_Verify: %s\n", (ret == 1) ? "true" : "false");
+
+    fclose(pbkey_from_file);
+    fclose(pkey_from_file);
+}
 
 /*
  @brief: private key encryption
@@ -112,9 +155,9 @@ std::string RsaPubDecrypt(const std::string & cipher_text, const std::string & p
     RSA *rsa = RSA_new();
 
      // Note--------Use the public key in the first format for decryption
-    //rsa = PEM_read_bio_RSAPublicKey(keybio, &rsa, NULL, NULL);
+    rsa = PEM_read_bio_RSAPublicKey(keybio, &rsa, NULL, NULL);
      // Note--------Use the public key in the second format for decryption (we use this format as an example)
-    rsa = PEM_read_bio_RSA_PUBKEY(keybio, &rsa, NULL, NULL);
+    //rsa = PEM_read_bio_RSA_PUBKEY(keybio, &rsa, NULL, NULL);
     if (!rsa)
     {
          unsigned long err = ERR_get_error(); //Get the error number
@@ -170,9 +213,9 @@ void GenerateRSAKey(std::string & out_pub_key, std::string & out_pri_key)
          // Generate private key
     PEM_write_bio_RSAPrivateKey(pri, keypair, NULL, NULL, 0, NULL, NULL);
          // Note------Generate the public key in the first format
-    //PEM_write_bio_RSAPublicKey(pub, keypair);
+    PEM_write_bio_RSAPublicKey(pub, keypair);
          // Note------Generate the public key in the second format (this is used in the code here)
-    PEM_write_bio_RSA_PUBKEY(pub, keypair);
+    //PEM_write_bio_RSA_PUBKEY(pub, keypair);
 
      // Get the length
     pri_len = BIO_pending(pri);
@@ -369,6 +412,7 @@ class EnclaveDemo : public TrustedApplication {
       case guide::asylo::Demo::CREATERSA: {
         GenerateRSAKey(pubkey,prikey);
         encrypt_text = RsaPriEncrypt((user_message), prikey);
+        doSign(encrypt_text);
         decrypt_text = RsaPubDecrypt(encrypt_text, pubkey);
         SetEnclaveOutputMessage(output, decrypt_text);
         break;
