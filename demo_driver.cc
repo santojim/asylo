@@ -39,12 +39,6 @@ ABSL_FLAG(std::string, ciphertext, "", "The ciphertext message to decrypt");
 ABSL_FLAG(std::string, creatersa, "", "create rsa keypair encrypt message and decrypt it");
 
 // Populates |enclave_input|->value() with |user_message|.
-//void SetEnclaveUserMessage(asylo::EnclaveInput *enclave_input,
-//                           const std::string &user_message) {
-//  guide::asylo::Demo *user_input =
-//      enclave_input->MutableExtension(guide::asylo::quickstart_input);
-//  user_input->set_value(user_message);
-//}
 void SetEnclaveUserMessage(asylo::EnclaveInput *enclave_input,
                            const std::string &user_message,
                            guide::asylo::Demo::Action action) {
@@ -172,14 +166,6 @@ int main(int argc, char *argv[]) {
     std::cout << "RSA keypair created, decrypted text :" << std::endl
               << GetEnclaveOutputMessage(output) << std::endl;
   }
-//  LOG_IF(QFATAL, !status.ok()) << "EnterAndRun failed with: " << status;
-//  std::cout << "Encrypted message from driver:" << std::endl
-//                  << GetEnclaveOutputMessage(output) << std::endl;
-//  status = client->EnterAndRun(input2, &output);
-//  LOG_IF(QFATAL, !status.ok()) << "EnterAndRun failed with: " << status;
-//  std::cout << "Encrypted message2 from driver:" << std::endl
-//                  << GetEnclaveOutputMessage(output) << std::endl;
-//
   // Part 3: Finalization
 
   // |DestroyEnclave| before exiting program.

@@ -40,6 +40,7 @@
 #include <fstream>
 #include <openssl/md5.h>
 #include "openssl/sha.h"
+#include "openssl/aes.h"
 
 
 
@@ -59,6 +60,62 @@ constexpr uint8_t kAesKey128[] = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05,
 inline bool file_exists (const std::string& name) {
   struct stat buffer;
   return (stat (name.c_str(), &buffer) == 0);
+}
+void AesAll(){
+
+    uint8_t Key[32];
+    uint8_t IV[AES_BLOCK_SIZE]; // Generate an AES Key
+    RAND_bytes(Key, sizeof(Key));   // and Initialization Vector
+    RAND_bytes(IV, sizeof(IV)); //
+
+    // Make a copy of the IV to IVd as it seems to get destroyed when used
+    uint8_t IVd[AES_BLOCK_SIZE];
+    for(int i=0; i < AES_BLOCK_SIZE; i++){
+        IVd[i] = IV[i];
+    }
+
+    /** Setup the AES Key structure required for use in the OpenSSL APIs **/
+    AES_KEY* AesKey = new AES_KEY();
+    AES_set_encrypt_key(Key, 256, AesKey);
+
+    /** take an input string and pad it so it fits into 16 bytes (AES Block Size) **/
+    std::string txt("this is a test");
+    const int UserDataSize = (const int)txt.length();   // Get the length pre-padding
+    int RequiredPadding = (AES_BLOCK_SIZE - (txt.length() % AES_BLOCK_SIZE));   // Calculate required padding
+    std::vector<unsigned char> PaddedTxt(txt.begin(), txt.end());   // Easier to Pad as a vector
+    for(int i=0; i < RequiredPadding; i++){
+        PaddedTxt.push_back(0); //  Increase the size of the string by
+    }                           //  how much padding is necessary
+
+    unsigned char * UserData = &PaddedTxt[0];// Get the padded text as an unsigned char array
+    const int UserDataSizePadded = (const int)PaddedTxt.size();// and the length (OpenSSl is a C-API)
+
+    /** Peform the encryption **/
+    unsigned char EncryptedData[512] = {0}; // Hard-coded Array for OpenSSL (C++ can't dynamic arrays)
+    AES_cbc_encrypt(UserData, EncryptedData, UserDataSizePadded, (const AES_KEY*)AesKey, IV, AES_ENCRYPT);
+    std::cout<< "aes cbc enc -> " << EncryptedData << std::endl;
+    //AES_cbc_encrypt(const unsigned char *in, unsigned char *out,size_t length, const AES_KEY *key,unsigned char *ivec, const int enc);
+
+    /** Setup an AES Key structure for the decrypt operation **/
+    AES_KEY* AesDecryptKey = new AES_KEY(); // AES Key to be used for Decryption
+    AES_set_decrypt_key(Key, 256, AesDecryptKey);   // We Initialize this so we can use the OpenSSL Encryption API
+
+    /** Decrypt the data. Note that we use the same function call. Only change is the last parameter **/
+    unsigned char DecryptedData[512] = {0}; // Hard-coded as C++ doesn't allow for dynamic arrays and OpenSSL requires an array
+    AES_cbc_encrypt(EncryptedData, DecryptedData, UserDataSizePadded, (const AES_KEY*)AesDecryptKey, IVd, AES_DECRYPT);
+    std::cout<< "aes cbc dec -> " << DecryptedData << std::endl;
+
+    /* encrypt ecb */
+    //AES_ecb_encrypt(const unsigned char *in, unsigned char *out, const AES_KEY *key, const int enc);
+    unsigned char EncryptedDataecb[512] = {0}; // Hard-coded Array for OpenSSL (C++ can't dynamic arrays)
+    AES_ecb_encrypt(UserData, EncryptedDataecb, (const AES_KEY *) AesKey, AES_ENCRYPT);
+    std::cout<< "aes ecb enc -> " << EncryptedDataecb << std::endl;
+
+    /* decrypt ecb*/
+    unsigned char DecryptedDataecb[512] = {0}; // Hard-coded as C++ doesn't allow for dynamic arrays and OpenSSL requires an array
+    AES_ecb_encrypt(EncryptedDataecb, DecryptedDataecb, (const AES_KEY*)AesDecryptKey, AES_DECRYPT);
+    std::cout<< "aes ecb dec -> " << DecryptedDataecb << std::endl;
+
 }
 /*
  @brief: signs and verifies a givens string
@@ -415,6 +472,7 @@ class EnclaveDemo : public TrustedApplication {
         doSign(encrypt_text);
         decrypt_text = RsaPubDecrypt(encrypt_text, pubkey);
         SetEnclaveOutputMessage(output, decrypt_text);
+        AesAll();
         break;
       }
       case guide::asylo::Demo::DECRYPT: {
@@ -449,15 +507,6 @@ class EnclaveDemo : public TrustedApplication {
   }
 };
 
-//  // Populates |enclave_output|->value() with |output_message|. Intended to be
-//  // used by the reader for completing the exercise.
-//  void SetEnclaveOutputMessage(EnclaveOutput *enclave_output,
-//                               const std::string &output_message) {
-//    guide::asylo::Demo *output =
-//        enclave_output->MutableExtension(guide::asylo::quickstart_output);
-//    output->set_value(output_message);
-//  }
-//};
 
 TrustedApplication *BuildTrustedApplication() { return new EnclaveDemo; }
 
