@@ -41,6 +41,10 @@
 #include <openssl/md5.h>
 #include "openssl/sha.h"
 #include "openssl/aes.h"
+#include <openssl/dh.h>
+#include <openssl/engine.h>
+
+
 
 
 
@@ -57,6 +61,86 @@ namespace {
 constexpr uint8_t kAesKey128[] = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05,
                                   0x06, 0x07, 0x08, 0x09, 0x10, 0x11,
                                   0x12, 0x13, 0x14, 0x15};
+static void print_secret(unsigned char *sec, size_t len)
+{
+    size_t i;
+
+    for (i = 0; i < len; ++i)
+    printf("%x", sec[i]);
+
+    printf("\n");
+}
+static int CreateDiffieHellman()
+{
+    DH *dh1, *dh2;
+    //BIGNUM *p, *g;
+    unsigned char *sec1, *sec2;
+    size_t size;
+    int ret;
+
+
+    dh1 = DH_new();
+    dh2 = DH_new();
+    DH_generate_parameters_ex(dh1, 64, DH_GENERATOR_2, NULL);
+
+
+    /* 1. set keys */
+    ret = DH_generate_key(dh1);
+    /* 2. set shared parameter p & g*/
+    dh2->p = BN_dup(dh1->p);
+    dh2->g = BN_dup(dh1->g);
+    std::cout<<"ret is" << ret <<std::endl;
+    if (ret == 0) {
+    fprintf(stderr, "dh1 DH_generate_key\n");
+    exit(EXIT_FAILURE);
+    }
+    ret = DH_generate_key(dh2);
+    if (ret == 0) {
+    fprintf(stderr, "dh2 DH_generate_key\n");
+    exit(EXIT_FAILURE);
+    }
+
+    /* 3. compute shared secret */
+    size = DH_size(dh1);
+    if (size != DH_size(dh2)) {
+    fprintf(stderr, "size does not match!\n");
+    exit(EXIT_FAILURE);
+    }
+    sec1 = (unsigned char *)malloc(size);
+    sec2 = (unsigned char *)malloc(size);
+    if (!sec1 || !sec2) {
+    perror("malloc");
+    exit(EXIT_FAILURE);
+    }
+    ret = DH_compute_key(sec1, dh2->pub_key, dh1);
+    if (ret == -1) {
+    fprintf(stderr, "DH_compute_key");
+    exit(EXIT_FAILURE);
+    }
+    ret = DH_compute_key(sec2, dh1->pub_key, dh2);
+    if (ret == -1) {
+    fprintf(stderr, "DH_compute_key");
+    exit(EXIT_FAILURE);
+    }
+
+    /* 4. compare shared secret */
+    printf("shared secret 1\n");
+    print_secret(sec1, size);
+    printf("shared secret 2\n");
+    print_secret(sec2, size);
+
+    if (memcmp(sec1, sec2, size) == 0)
+    ret = 1;
+    else
+    ret = 0;
+
+    free(sec2);
+    free(sec1);
+    DH_free(dh2);
+    DH_free(dh1);
+
+    return ret;
+}
 void AesAll(std::string txt){
 
     uint8_t Key[32];
@@ -476,6 +560,11 @@ class EnclaveDemo : public TrustedApplication {
       case guide::asylo::Demo::AES: {
         AesAll(user_message);
         SetEnclaveOutputMessage(output, "Aes Done");
+        break;
+      }
+      case guide::asylo::Demo::DFHLM: {
+        CreateDiffieHellman();
+        SetEnclaveOutputMessage(output, "D-H Done");
         break;
       }
       case guide::asylo::Demo::CREATERSA: {

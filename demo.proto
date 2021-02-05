@@ -37,6 +37,7 @@ message Demo {
     SHA512SUM= 5;
     CREATERSA= 6;
     AES      = 7;
+    DFHLM    = 8;
   }
   optional Action action = 2;
 }
