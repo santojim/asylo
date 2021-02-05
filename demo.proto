@@ -34,8 +34,9 @@ message Demo {
     DECRYPT = 2;
     MD5SUM  = 3;
     SHA1SUM = 4;
-    SHA512SUM = 5;
+    SHA512SUM= 5;
     CREATERSA= 6;
+    AES      = 7;
   }
   optional Action action = 2;
 }

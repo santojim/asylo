@@ -37,6 +37,7 @@ ABSL_FLAG(std::string, sha512sum, "", "The message to digest using sha512sum");
 ABSL_FLAG(std::string, message2, "", "The second message to encrypt");
 ABSL_FLAG(std::string, ciphertext, "", "The ciphertext message to decrypt");
 ABSL_FLAG(std::string, creatersa, "", "create rsa keypair encrypt message and decrypt it");
+ABSL_FLAG(std::string, aes, "", "The message to be encrypted & decrypted");
 
 // Populates |enclave_input|->value() with |user_message|.
 void SetEnclaveUserMessage(asylo::EnclaveInput *enclave_input,
@@ -164,6 +165,15 @@ int main(int argc, char *argv[]) {
     status = client->EnterAndRun(input, &output);
     LOG_IF(QFATAL, !status.ok()) << "EnterAndRun failed with: " << status;
     std::cout << "RSA keypair created, decrypted text :" << std::endl
+              << GetEnclaveOutputMessage(output) << std::endl;
+  }
+
+  if (!absl::GetFlag(FLAGS_aes).empty()) {
+    SetEnclaveUserMessage(&input, absl::GetFlag(FLAGS_aes),
+                          guide::asylo::Demo::AES);
+    status = client->EnterAndRun(input, &output);
+    LOG_IF(QFATAL, !status.ok()) << "EnterAndRun failed with: " << status;
+    std::cout << "AES keypair created" << std::endl
               << GetEnclaveOutputMessage(output) << std::endl;
   }
   // Part 3: Finalization

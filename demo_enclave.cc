@@ -57,11 +57,7 @@ namespace {
 constexpr uint8_t kAesKey128[] = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05,
                                   0x06, 0x07, 0x08, 0x09, 0x10, 0x11,
                                   0x12, 0x13, 0x14, 0x15};
-inline bool file_exists (const std::string& name) {
-  struct stat buffer;
-  return (stat (name.c_str(), &buffer) == 0);
-}
-void AesAll(){
+void AesAll(std::string txt){
 
     uint8_t Key[32];
     uint8_t IV[AES_BLOCK_SIZE]; // Generate an AES Key
@@ -79,7 +75,6 @@ void AesAll(){
     AES_set_encrypt_key(Key, 256, AesKey);
 
     /** take an input string and pad it so it fits into 16 bytes (AES Block Size) **/
-    std::string txt("this is a test");
     const int UserDataSize = (const int)txt.length();   // Get the length pre-padding
     int RequiredPadding = (AES_BLOCK_SIZE - (txt.length() % AES_BLOCK_SIZE));   // Calculate required padding
     std::vector<unsigned char> PaddedTxt(txt.begin(), txt.end());   // Easier to Pad as a vector
@@ -91,9 +86,15 @@ void AesAll(){
     const int UserDataSizePadded = (const int)PaddedTxt.size();// and the length (OpenSSl is a C-API)
 
     /** Peform the encryption **/
-    unsigned char EncryptedData[512] = {0}; // Hard-coded Array for OpenSSL (C++ can't dynamic arrays)
+    unsigned char EncryptedData[512] = {0};
     AES_cbc_encrypt(UserData, EncryptedData, UserDataSizePadded, (const AES_KEY*)AesKey, IV, AES_ENCRYPT);
-    std::cout<< "aes cbc enc -> " << EncryptedData << std::endl;
+    std::cout<< "aes cbc enc -> " ;
+    printf("hashedChars: ");
+    int data_length = strlen((char*)EncryptedData);
+    for (int i = 0; i < data_length; i++) {
+      printf("%x", EncryptedData[i]);
+    }
+    printf("\n");
     //AES_cbc_encrypt(const unsigned char *in, unsigned char *out,size_t length, const AES_KEY *key,unsigned char *ivec, const int enc);
 
     /** Setup an AES Key structure for the decrypt operation **/
@@ -101,18 +102,24 @@ void AesAll(){
     AES_set_decrypt_key(Key, 256, AesDecryptKey);   // We Initialize this so we can use the OpenSSL Encryption API
 
     /** Decrypt the data. Note that we use the same function call. Only change is the last parameter **/
-    unsigned char DecryptedData[512] = {0}; // Hard-coded as C++ doesn't allow for dynamic arrays and OpenSSL requires an array
+    unsigned char DecryptedData[512] = {0};
     AES_cbc_encrypt(EncryptedData, DecryptedData, UserDataSizePadded, (const AES_KEY*)AesDecryptKey, IVd, AES_DECRYPT);
     std::cout<< "aes cbc dec -> " << DecryptedData << std::endl;
 
     /* encrypt ecb */
     //AES_ecb_encrypt(const unsigned char *in, unsigned char *out, const AES_KEY *key, const int enc);
-    unsigned char EncryptedDataecb[512] = {0}; // Hard-coded Array for OpenSSL (C++ can't dynamic arrays)
+    unsigned char EncryptedDataecb[512] = {0};
     AES_ecb_encrypt(UserData, EncryptedDataecb, (const AES_KEY *) AesKey, AES_ENCRYPT);
-    std::cout<< "aes ecb enc -> " << EncryptedDataecb << std::endl;
+    std::cout<< "aes ecb enc -> " ;
+    printf("hashedChars: ");
+    data_length = strlen((char*)EncryptedDataecb);
+    for (int i = 0; i < data_length; i++) {
+      printf("%x", EncryptedDataecb[i]);
+    }
+    printf("\n");
 
     /* decrypt ecb*/
-    unsigned char DecryptedDataecb[512] = {0}; // Hard-coded as C++ doesn't allow for dynamic arrays and OpenSSL requires an array
+    unsigned char DecryptedDataecb[512] = {0};
     AES_ecb_encrypt(EncryptedDataecb, DecryptedDataecb, (const AES_KEY*)AesDecryptKey, AES_DECRYPT);
     std::cout<< "aes ecb dec -> " << DecryptedDataecb << std::endl;
 
@@ -466,13 +473,17 @@ class EnclaveDemo : public TrustedApplication {
         SetEnclaveOutputMessage(output, Sha2Sum(user_message));
         break;
       }
+      case guide::asylo::Demo::AES: {
+        AesAll(user_message);
+        SetEnclaveOutputMessage(output, "Aes Done");
+        break;
+      }
       case guide::asylo::Demo::CREATERSA: {
         GenerateRSAKey(pubkey,prikey);
         encrypt_text = RsaPriEncrypt((user_message), prikey);
         doSign(encrypt_text);
         decrypt_text = RsaPubDecrypt(encrypt_text, pubkey);
         SetEnclaveOutputMessage(output, decrypt_text);
-        AesAll();
         break;
       }
       case guide::asylo::Demo::DECRYPT: {
