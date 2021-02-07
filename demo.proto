@@ -30,8 +30,6 @@ message Demo {
   optional string value = 1;
   enum Action {
     UNKNOWN = 0;
-    ENCRYPT = 1;
-    DECRYPT = 2;
     MD5SUM  = 3;
     SHA1SUM = 4;
     SHA512SUM= 5;

@@ -26,16 +26,10 @@
 #include "asylo/util/logging.h"
 #include "quickstart/demo.pb.h"
 
-//ABSL_FLAG(std::string, enclave_path, "",
-//          "Path to enclave binary image to load");
-//ABSL_FLAG(std::string, message, "", "Message to encrypt");
 ABSL_FLAG(std::string, enclave_path, "", "Path to enclave to load");
-ABSL_FLAG(std::string, message1, "", "The first message to encrypt");
 ABSL_FLAG(std::string, md5sum, "", "The message to digest using md5sum");
 ABSL_FLAG(std::string, sha1sum, "", "The message to digest using sha1sum");
 ABSL_FLAG(std::string, sha512sum, "", "The message to digest using sha512sum");
-ABSL_FLAG(std::string, message2, "", "The second message to encrypt");
-ABSL_FLAG(std::string, ciphertext, "", "The ciphertext message to decrypt");
 ABSL_FLAG(std::string, creatersa, "", "create rsa keypair encrypt message and decrypt it");
 ABSL_FLAG(std::string, aes, "", "The message to be encrypted & decrypted");
 ABSL_FLAG(std::string, dfhlm, "", "Diffie Hellman key exchange test");
@@ -61,16 +55,14 @@ int main(int argc, char *argv[]) {
 
   constexpr char kEnclaveName[] = "demo_enclave";
 
-//  const std::string message = absl::GetFlag(FLAGS_message);
-//  LOG_IF(QFATAL, message.empty()) << "Empty --message flag.";
-//
   const std::string enclave_path = absl::GetFlag(FLAGS_enclave_path);
-//  LOG_IF(QFATAL, enclave_path.empty()) << "Empty --enclave_path flag.";
-//
-  LOG_IF(QFATAL, absl::GetFlag(FLAGS_message1).empty() &&
-                     absl::GetFlag(FLAGS_message2).empty() &&
-                     absl::GetFlag(FLAGS_ciphertext).empty())
-      << "Must specify at least one of --message1, --message2, or --ciphertext "
+  LOG_IF(QFATAL, absl::GetFlag(FLAGS_md5sum).empty() &&
+                     absl::GetFlag(FLAGS_sha1sum).empty() &&
+                     absl::GetFlag(FLAGS_sha512sum).empty() &&
+                     absl::GetFlag(FLAGS_creatersa).empty() &&
+                     absl::GetFlag(FLAGS_aes).empty() &&
+                     absl::GetFlag(FLAGS_dfhlm).empty())
+      << "Must specify at least one of --sha1sum ,--sha512sum ,--creatersa ,--aes or --dfhlm "
          "flag values";
 
   // Part 1: Initialization
@@ -106,15 +98,6 @@ int main(int argc, char *argv[]) {
   asylo::EnclaveClient *const client = manager->GetClient(kEnclaveName);
   status = client->EnterAndRun(input, &output);
 
-  if (!absl::GetFlag(FLAGS_message1).empty()) {
-    SetEnclaveUserMessage(&input, absl::GetFlag(FLAGS_message1),
-                          guide::asylo::Demo::ENCRYPT);
-    status = client->EnterAndRun(input, &output);
-    LOG_IF(QFATAL, !status.ok()) << "EnterAndRun failed with: " << status;
-    std::cout << "Encrypted message1 from driver:" << std::endl
-              << GetEnclaveOutputMessage(output) << std::endl;
-  }
-
   if (!absl::GetFlag(FLAGS_md5sum).empty()) {
     SetEnclaveUserMessage(&input, absl::GetFlag(FLAGS_md5sum),
                           guide::asylo::Demo::MD5SUM);
@@ -139,24 +122,6 @@ int main(int argc, char *argv[]) {
     status = client->EnterAndRun(input, &output);
     LOG_IF(QFATAL, !status.ok()) << "EnterAndRun failed with: " << status;
     std::cout << "Digest sha512 from driver:" << std::endl
-              << GetEnclaveOutputMessage(output) << std::endl;
-  }
-
-  if (!absl::GetFlag(FLAGS_message2).empty()) {
-    SetEnclaveUserMessage(&input, absl::GetFlag(FLAGS_message2),
-                          guide::asylo::Demo::ENCRYPT);
-    status = client->EnterAndRun(input, &output);
-    LOG_IF(QFATAL, !status.ok()) << "EnterAndRun failed with: " << status;
-    std::cout << "Encrypted message2 from driver:" << std::endl
-              << GetEnclaveOutputMessage(output) << std::endl;
-  }
-
-  if (!absl::GetFlag(FLAGS_ciphertext).empty()) {
-    SetEnclaveUserMessage(&input, absl::GetFlag(FLAGS_ciphertext),
-                          guide::asylo::Demo::DECRYPT);
-    status = client->EnterAndRun(input, &output);
-    LOG_IF(QFATAL, !status.ok()) << "EnterAndRun failed with: " << status;
-    std::cout << "Decrypted ciphertext from driver:" << std::endl
               << GetEnclaveOutputMessage(output) << std::endl;
   }
 

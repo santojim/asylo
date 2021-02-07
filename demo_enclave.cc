@@ -89,7 +89,6 @@ static int CreateDiffieHellman()
     /* 2. set shared parameter p & g*/
     dh2->p = BN_dup(dh1->p);
     dh2->g = BN_dup(dh1->g);
-    std::cout<<"ret is" << ret <<std::endl;
     if (ret == 0) {
     fprintf(stderr, "dh1 DH_generate_key\n");
     exit(EXIT_FAILURE);
@@ -539,12 +538,6 @@ class EnclaveDemo : public TrustedApplication {
     std::string decrypt_text;
 
     switch (GetEnclaveUserAction(input)) {
-      case guide::asylo::Demo::ENCRYPT: {
-        std::string result;
-        ASYLO_ASSIGN_OR_RETURN(result, EncryptMessage(user_message));
-        SetEnclaveOutputMessage(output, result);
-        break;
-      }
       case guide::asylo::Demo::MD5SUM: {
         SetEnclaveOutputMessage(output, Md5Sum(user_message));
         break;
@@ -573,12 +566,6 @@ class EnclaveDemo : public TrustedApplication {
         doSign(encrypt_text);
         decrypt_text = RsaPubDecrypt(encrypt_text, pubkey);
         SetEnclaveOutputMessage(output, decrypt_text);
-        break;
-      }
-      case guide::asylo::Demo::DECRYPT: {
-        CleansingString result;
-        ASYLO_ASSIGN_OR_RETURN(result, DecryptMessage(user_message));
-        SetEnclaveOutputMessage(output, result);
         break;
       }
       default:
