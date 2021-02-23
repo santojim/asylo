@@ -28,7 +28,7 @@
 #include "asylo/util/cleansing_types.h"
 #include "asylo/util/status_macros.h"
 #include "asylo/util/statusor.h"
-#include "quickstart/demo.pb.h"
+#include "network_sec_project/demo.pb.h"
 #include <openssl/rand.h>
 #include <openssl/rsa.h>
 #include <openssl/pem.h>

@@ -24,7 +24,7 @@
 #include "asylo/client.h"
 #include "asylo/platform/primitives/sgx/loader.pb.h"
 #include "asylo/util/logging.h"
-#include "quickstart/demo.pb.h"
+#include "network_sec_project/demo.pb.h"
 
 ABSL_FLAG(std::string, enclave_path, "", "Path to enclave to load");
 ABSL_FLAG(std::string, md5sum, "", "The message to digest using md5sum");
