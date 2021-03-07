@@ -24,7 +24,7 @@
 #include "asylo/client.h"
 #include "asylo/platform/primitives/sgx/loader.pb.h"
 #include "asylo/util/logging.h"
-#include "network_sec_project/demo.pb.h"
+#include "network_sec_project/params.pb.h"
 
 ABSL_FLAG(std::string, enclave_path, "", "Path to enclave to load");
 ABSL_FLAG(std::string, md5sum, "", "The message to digest using md5sum");
@@ -53,7 +53,7 @@ const std::string GetEnclaveOutputMessage(const asylo::EnclaveOutput &output) {
 int main(int argc, char *argv[]) {
   absl::ParseCommandLine(argc, argv);
 
-  constexpr char kEnclaveName[] = "demo_enclave";
+  constexpr char kEnclaveName[] = "trusted_enclave";
 
   const std::string enclave_path = absl::GetFlag(FLAGS_enclave_path);
   LOG_IF(QFATAL, absl::GetFlag(FLAGS_md5sum).empty() &&

@@ -29,21 +29,21 @@ package(
 
 # Example and exercise for using Asylo toolkits.
 proto_library(
-    name = "demo_proto",
-    srcs = ["demo.proto"],
+    name = "params_proto",
+    srcs = ["params.proto"],
     deps = ["@com_google_asylo//asylo:enclave_proto"],
 )
 
 cc_proto_library(
-    name = "demo_cc_proto",
-    deps = [":demo_proto"],
+    name = "params_cc_proto",
+    deps = [":params_proto"],
 )
 
 cc_unsigned_enclave(
-    name = "demo_enclave_unsigned.so",
-    srcs = ["demo_enclave.cc"],
+    name = "trusted_enclave_unsigned.so",
+    srcs = ["trusted_enclave.cc"],
     deps = [
-        ":demo_cc_proto",
+        ":params_cc_proto",
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/strings",
         "@com_google_asylo//asylo:enclave_runtime",
@@ -54,18 +54,18 @@ cc_unsigned_enclave(
 )
 
 debug_sign_enclave(
-    name = "demo_enclave.so",
-    unsigned = "demo_enclave_unsigned.so",
+    name = "trusted_enclave.so",
+    unsigned = "trusted_enclave_unsigned.so",
 )
 
 enclave_loader(
     name = "network_sec_project",
-    srcs = ["demo_driver.cc"],
+    srcs = ["driver_untrusted.cc"],
     backends = sgx.backend_labels,  # Has SGX loader dependencies
-    enclaves = {"enclave": ":demo_enclave.so"},
+    enclaves = {"enclave": ":trusted_enclave.so"},
     loader_args = ["--enclave_path='{enclave}'"],
     deps = [
-        ":demo_cc_proto",
+        ":params_cc_proto",
         "@com_google_absl//absl/flags:flag",
         "@com_google_absl//absl/flags:parse",
         "@com_google_asylo//asylo:enclave_cc_proto",
